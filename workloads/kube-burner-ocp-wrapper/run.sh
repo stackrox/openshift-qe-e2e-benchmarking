@@ -1,6 +1,16 @@
 #!/bin/bash -e
 
-set -e
+# Dev presets
+CHURN=${CHURN:-false}
+WORKLOAD=${WORKLOAD:-cluster-density-v2}
+ITERATIONS=${ITERATIONS:-2}
+
+echo "RUNNING DEV BRANCH"
+pwd
+
+set +e
+set -x
+
 source ./egressip.sh
 
 ES_SERVER=${ES_SERVER=https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com}
@@ -19,7 +29,11 @@ UUID=${UUID:-$(uuidgen)}
 KUBE_DIR=${KUBE_DIR:-/tmp}
 
 download_binary(){
-  KUBE_BURNER_URL="https://github.com/kube-burner/kube-burner-ocp/releases/download/v${KUBE_BURNER_VERSION}/kube-burner-ocp-V${KUBE_BURNER_VERSION}-linux-x86_64.tar.gz"
+  if uname | grep -i darwin; then
+    KUBE_BURNER_URL="https://github.com/kube-burner/kube-burner-ocp/releases/download/v${KUBE_BURNER_VERSION}/kube-burner-ocp-V${KUBE_BURNER_VERSION}-darwin-arm64.tar.gz"
+  else
+    KUBE_BURNER_URL="https://github.com/kube-burner/kube-burner-ocp/releases/download/v${KUBE_BURNER_VERSION}/kube-burner-ocp-V${KUBE_BURNER_VERSION}-linux-x86_64.tar.gz"
+  fi
   curl --fail --retry 8 --retry-all-errors -sS -L "${KUBE_BURNER_URL}" | tar -xzC "${KUBE_DIR}/" kube-burner-ocp
 }
 
@@ -153,8 +167,25 @@ set +e
 
 echo $cmd
 JOB_START=${JOB_START:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")};
+
+set -x
+
+export ES_INDEX=${ES_INDEX:-ripsaw-kube-burner}
+export EXTRA_METRICS_FILE=${EXTRA_METRICS_FILE:-"https://raw.githubusercontent.com/stackrox/stackrox/master/tests/performance/scale/tests/kube-burner/cluster-density/metrics.yml"}
+curl -LsSo extra_metrics_file.yml "${EXTRA_METRICS_FILE}"
+
+# Get the configuration kube-burner will run.
+$cmd --extract
+ls -latr *.y*ml
+
+# Modify the configuration to reference additional local metrics files.
+# > replace '[{{.METRICS}}]' string with '[extra_metrics_file.yml,{{.METRICS}}]' in every yaml file
+sed -i '' -e 's/\[{{.METRICS}}\]/\[extra_metrics_file.yml,{{.METRICS}}\]/' *.y*ml
+grep '{{.METRICS}}' *.y*ml  # show which lines in which files changed
+
 $cmd
 exit_code=$?
+
 JOB_END=${JOB_END:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")};
 if [ $exit_code -eq 0 ]; then
   JOB_STATUS="success"
