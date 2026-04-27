@@ -149,6 +149,10 @@ if [[ ${WORKLOAD} =~ "cluster-density" ]] && [[ ! ${WORKLOAD} =~ "web-burner" ]]
   ITERATIONS=${ITERATIONS:?}
   cmd+=" --iterations=${ITERATIONS} --churn=${CHURN}"
 fi
+# Add churn flag if CHURN_DURATION is set and non-zero
+if [[ -n ${CHURN_DURATION:-} ]] && [[ ${CHURN_DURATION} != "0" ]]; then
+  cmd+=" --churn=true"
+fi
 if [[ ${WORKLOAD} =~ "egressip" ]]; then
   prep_aws
   get_egressip_external_server
