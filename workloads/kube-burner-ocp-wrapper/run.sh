@@ -189,6 +189,8 @@ else
 fi
 grep '{{.METRICS}}' *.y*ml  # show which lines in which files changed
 
+cat berserker-load.yml
+
 $cmd
 exit_code=$?
 
