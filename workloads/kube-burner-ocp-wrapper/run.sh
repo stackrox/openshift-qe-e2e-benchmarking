@@ -189,10 +189,28 @@ else
 fi
 grep '{{.METRICS}}' *.y*ml  # show which lines in which files changed
 
+echo "=== berserker-load.yml ==="
 cat berserker-load.yml
+echo "=== berserker-daemonset.yml ==="
+cat berserker-daemonset.yml
+echo "=== berserker-configmap.yml ==="
+cat berserker-configmap.yml
+echo "=== service.yml ==="
+cat service.yml
 
 $cmd
 exit_code=$?
+
+echo "=== Post-run debugging ==="
+oc get namespaces | grep berserker || echo "No berserker namespaces found"
+for ns in berserker-0 berserker-1; do
+  echo "=== DaemonSets in ${ns} ==="
+  oc get daemonsets -n "${ns}" 2>&1 || true
+  echo "=== Pods in ${ns} ==="
+  oc get pods -n "${ns}" -o wide 2>&1 || true
+  echo "=== Events in ${ns} ==="
+  oc get events -n "${ns}" --sort-by='.lastTimestamp' 2>&1 | tail -20 || true
+done
 
 JOB_END=${JOB_END:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")};
 if [ $exit_code -eq 0 ]; then
